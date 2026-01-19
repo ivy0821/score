@@ -1,33 +1,44 @@
 name: Grade Monitor Bot
 
+# 設定觸發時間
 on:
   schedule:
-    # 每小時執行一次 (UTC 時間，15 分代表每小時的第 15 分鐘跑)
+    # 這是 cron 表示法，代表每小時的第 15 分鐘執行一次 (UTC 時間)
     - cron: '15 * * * *'
-  workflow_dispatch: # 讓你可以手動點擊執行按鈕測試
+  workflow_dispatch: # 允許手動在網頁點擊執行按鈕
+
+# 賦予寫入權限，讓 Actions 能把 last_score_count.txt 存回你的專案
+permissions:
+  contents: write
 
 jobs:
-  build:
+  run_monitor:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: 1. 複製程式碼到虛擬機
       uses: actions/checkout@v3
 
-    - name: Set up Python
+    - name: 2. 設定 Python 環境
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
 
-    - name: Install dependencies
+    - name: 3. 安裝必要套件
       run: |
         python -m pip install --upgrade pip
         pip install selenium webdriver-manager requests
 
-    - name: Run Grade Bot
+    - name: 4. 執行成績監控程式
       env:
-        # 這裡從 GitHub Secrets 讀取隱私資訊
+        # 這裡會讀取你在 Settings 設定的 Secrets
         STU_ID: ${{ secrets.STU_ID }}
-        PWD: ${{ secrets.STU_PWD }}
+        STU_PWD: ${{ secrets.STU_PWD }}
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: python check_grades.py
+
+    - name: 5. 如果紀錄檔有更新，自動儲存回 GitHub
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "自動更新成績公佈數量紀錄"
+        file_pattern: last_score_count.txt
