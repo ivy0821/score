@@ -56,6 +56,8 @@ class GradeMonitor:
     def check_grades(self):
         options = webdriver.ChromeOptions()
         options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         self.wait = WebDriverWait(self.driver, 25)
 
@@ -129,4 +131,5 @@ if __name__ == "__main__":
     while True:
         monitor.check_grades()
         print(f"[{time.strftime('%H:%M:%S')}] 完成巡邏。一小時後將再次執行...")
+
         time.sleep(3600)
