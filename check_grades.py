@@ -15,9 +15,8 @@ STU_ID = os.getenv('STU_ID')
 PWD = os.getenv('STU_PWD')
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK')
 
-# 中華大學學期設定
-TARGET_YEAR = "114"           # 請確保年份正確，114 可能導致系統查無資料
-TARGET_SEMESTER = "1"         # 1: 第一學期, 2: 第二學期
+TARGET_YEAR = "114"           # 固定為 113
+TARGET_SEMESTER = "1"         
 RECORD_FILE = "last_score_count.txt"
 # =============================================================
 
@@ -29,7 +28,6 @@ class GradeMonitor:
     def send_discord_notification(self, score_details):
         fields = [{"name": f"📘 {course}", "value": f"成績：**{score}** 分", "inline": False} 
                   for course, score in score_details.items()]
-
         data = {
             "username": "中華大學成績小幫手",
             "embeds": [{
@@ -51,7 +49,6 @@ class GradeMonitor:
 
     def check_grades(self):
         options = webdriver.ChromeOptions()
-        # 雲端執行必備參數，防止 Actions 卡死
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
@@ -69,12 +66,16 @@ class GradeMonitor:
             self.driver.find_element(By.NAME, "yes").click()
             print("✅ 登入成功")
 
-            # 切換 Frame 並點擊成績查詢
+            # 優化後的選單切換邏輯
             self.wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "leftFrame")))
-            self.driver.execute_script("document.evaluate(\"//li[contains(., '成績查詢系統')]/input\", document).singleNodeValue.checked = true;")
-            time.sleep(1)
-            query_link = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//a[@href='score_qry/score_index.asp']")))
-            self.driver.execute_script("arguments[0].click();", query_link)
+            # 改用更穩定的方式展開選單
+            expand_btn = self.wait.until(EC.element_to_be_clickable((By.XPATH, "//li[contains(text(), '成績查詢系統')]")))
+            self.driver.execute_script("arguments[0].scrollIntoView();", expand_btn)
+            expand_btn.click() 
+            
+            time.sleep(2)
+            query_link = self.wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "成績查詢")))
+            query_link.click()
 
             # 進入查詢頁面
             self.driver.switch_to.default_content()
@@ -88,8 +89,8 @@ class GradeMonitor:
             self.driver.find_element(By.XPATH, "//input[@value='查詢學期成績(Query OK)']").click()
             print(f"🔍 正在查詢 {TARGET_YEAR} 學年度成績...")
 
-            # 解析成績 (使用 Regex)
-            time.sleep(3)
+            # 解析成績
+            time.sleep(5)
             rows = self.driver.find_elements(By.XPATH, "//tr")
             score_results = {}
 
@@ -115,6 +116,8 @@ class GradeMonitor:
             else:
                 print("☕ 無新成績更新。")
 
+        except Exception as e:
+            print(f"❌ 發生錯誤: {e}")
         finally:
             if self.driver: self.driver.quit()
 
