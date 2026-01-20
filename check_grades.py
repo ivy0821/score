@@ -22,12 +22,12 @@ ACCOUNTS = [
     {
         "id": os.getenv('STU_ID_2'),
         "pwd": os.getenv('STU_PWD_2'),
-        "webhook": os.getenv('DISCORD_WEBHOOK_2'),
+        "webhook": os.getenv('DISCORD_WEBHOOK'),
         "record": "last_score_count_2.txt"
     }
 ]
 
-TARGET_YEAR = "113"           # 目標學年
+TARGET_YEAR = "114"           # 目標學年
 TARGET_SEMESTER = "1"         # 1: 第一學期
 # ===============================================
 
@@ -129,3 +129,4 @@ if __name__ == "__main__":
         if acc_info["id"]: # 確保 Secrets 有填寫才跑
             monitor = GradeMonitor(acc_info)
             monitor.run()
+
