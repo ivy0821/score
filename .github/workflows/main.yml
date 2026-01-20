@@ -8,11 +8,9 @@ on:
   # 支援在 GitHub 網頁手動點擊執行
   workflow_dispatch:
 
-# ================= 解決紅色叉叉的關鍵：權限設定 =================
-# 賦予寫入權限，讓 Actions 執行完後能把 last_score_count.txt 存回 Repository
+# 賦予寫入權限，讓 Actions 執行完後能把多個紀錄檔存回 Repository
 permissions:
   contents: write
-# =============================================================
 
 jobs:
   run_monitor:
@@ -32,17 +30,21 @@ jobs:
         python -m pip install --upgrade pip
         pip install selenium webdriver-manager requests
 
-    - name: 4. 執行成績監控程式 (Run Grade Bot)
+    - name: 4. 執行多帳號成績監控程式
       env:
-        # 從 GitHub Secrets 讀取你的隱私資料
+        # 第一組帳號 Secrets
         STU_ID: ${{ secrets.STU_ID }}
         STU_PWD: ${{ secrets.STU_PWD }}
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        # 第二組帳號 Secrets
+        STU_ID_2: ${{ secrets.STU_ID_2 }}
+        STU_PWD_2: ${{ secrets.STU_PWD_2 }}
+        DISCORD_WEBHOOK_2: ${{ secrets.DISCORD_WEBHOOK_2 }}
       run: python check_grades.py
 
-    - name: 5. 自動存檔並 Commit 更新 (解決重複通知問題)
-      # 如果偵測到 last_score_count.txt 有變動，會自動提交回 GitHub
+    - name: 5. 自動更新所有紀錄檔
+      # 使用萬用字元 * 確保兩個人的紀錄檔都會被儲存
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_message: "系統自動更新成績公佈數量紀錄"
-        file_pattern: last_score_count.txt
+        commit_message: "系統自動更新多帳號紀錄檔"
+        file_pattern: "last_score_count_*.txt"
