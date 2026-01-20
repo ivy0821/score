@@ -37,7 +37,6 @@ class GradeMonitor:
         self.webhook = acc["webhook"]
         self.record_file = acc["record"]
         self.driver = None
-        self.wait = None
 
     def send_discord_notification(self, score_details):
         fields = [{"name": f"📘 {course}", "value": f"成績：**{score}** 分", "inline": False} 
@@ -48,7 +47,7 @@ class GradeMonitor:
                 "title": f"🆕 帳號 {self.stu_id} 偵測到新成績！",
                 "color": 5763719,
                 "fields": fields,
-                "footer": {"text": f"檢查時間：{time.strftime('%H:%M:%S')}"}
+                "footer": {"text": f"檢查時間：{time.strftime('%Y-%m-%d %H:%M:%S')}"}
             }]
         }
         requests.post(self.webhook, json=data)
@@ -58,53 +57,30 @@ class GradeMonitor:
         options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--window-size=1920,1080') # 確保視窗大小一致
+        options.add_argument('--window-size=1920,1080')
         
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        self.wait = WebDriverWait(self.driver, 20)
+        wait = WebDriverWait(self.driver, 25)
 
         try:
             print(f"🚀 正在檢查帳號：{self.stu_id}...")
             self.driver.get("https://student2.chu.edu.tw/studentlogin.asp")
 
             # 1. 登入
-            self.wait.until(EC.presence_of_element_located((By.NAME, "username"))).send_keys(self.stu_id)
+            wait.until(EC.presence_of_element_located((By.NAME, "username"))).send_keys(self.stu_id)
             self.driver.find_element(By.NAME, "userpassword").send_keys(self.pwd)
             self.driver.find_element(By.NAME, "yes").click()
             time.sleep(3)
 
-            # 2. 切換到左側選單並點擊
-            self.wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "leftFrame")))
-            
-            # 使用 JS 直接強制勾選並觸發選單展開
-            js_expand = """
-            var inputs = document.getElementsByTagName('input');
-            for(var i=0; i<inputs.length; i++) {
-                if(inputs[i].type == 'checkbox' && inputs[i].nextSibling.textContent.contains('成績查詢系統')) {
-                    inputs[i].checked = true;
-                    break;
-                }
-            }
-            """
-            # 簡化版 XPath 定位展開
-            expand_xpath = "//li[contains(., '成績查詢系統')]/input"
-            cb = self.wait.until(EC.presence_of_element_located((By.XPATH, expand_xpath)))
-            if not cb.is_selected():
-                self.driver.execute_script("arguments[0].click();", cb)
-            
+            # 2. 暴力進入查詢頁面 (跳過複雜的選單點擊)
+            # 在 Frameset 架構下，直接跳轉 mainFrame 的內容最穩定
+            self.driver.get("https://student2.chu.edu.tw/score_qry/score_index.asp")
             time.sleep(2)
-            # 點擊「成績查詢」連結
-            query_link = self.wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "成績查詢")))
-            self.driver.execute_script("arguments[0].click();", query_link)
 
-            # 3. 切換到主畫面填寫
-            self.driver.switch_to.default_content()
-            self.wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "mainFrame")))
-            
-            year_in = self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[maxlength='3']")))
+            # 3. 填寫查詢條件 (這時已經在查詢頁面了)
+            year_in = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[maxlength='3']")))
             year_in.clear()
             year_in.send_keys(TARGET_YEAR)
-            
             Select(self.driver.find_element(By.TAG_NAME, "select")).select_by_value(TARGET_SEMESTER)
             self.driver.find_element(By.XPATH, "//input[@value='查詢學期成績(Query OK)']").click()
 
@@ -121,28 +97,27 @@ class GradeMonitor:
                         score = [p for p in t.split() if p.isdigit()][-1]
                         results[name] = score
 
-            # 5. 比對與紀錄
+            # 5. 紀錄與通知
             curr = len(results)
             last = 0
             if os.path.exists(self.record_file):
                 with open(self.record_file, "r") as f: last = int(f.read().strip() or 0)
 
-            print(f"📊 {self.stu_id} 掃描完畢，目前公佈科目：{curr}")
+            print(f"📊 {self.stu_id} 掃描完畢，科目數：{curr}")
 
             if curr > last:
                 self.send_discord_notification(results)
                 with open(self.record_file, "w") as f: f.write(str(curr))
-                print(f"✅ {self.stu_id} 偵測到更新，已發送通知。")
+                print(f"✅ {self.stu_id} 已傳送通知。")
             else:
-                print(f"☕ {self.stu_id} 無新成績。")
+                print(f"☕ {self.stu_id} 無新資料。")
 
         except Exception as e:
-            print(f"❌ 帳號 {self.stu_id} 執行失敗: {str(e)}")
+            print(f"❌ 帳號 {self.stu_id} 執行失敗：{str(e)}")
         finally:
             if self.driver: self.driver.quit()
 
 if __name__ == "__main__":
-    for acc_info in ACCOUNTS:
-        if acc_info["id"] and acc_info["pwd"]:
-            monitor = GradeMonitor(acc_info)
-            monitor.run()
+    for acc in ACCOUNTS:
+        if acc["id"] and acc["pwd"]:
+            GradeMonitor(acc).run()
