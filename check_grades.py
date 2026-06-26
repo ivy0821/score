@@ -27,7 +27,7 @@ ACCOUNTS = [
 ]
 
 TARGET_YEAR = "114"
-TARGET_SEMESTER = "1"
+TARGET_SEMESTER = "2"
 # ===============================================
 
 class GradeMonitor:
